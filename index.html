@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>POS Tagger Itemized</title>
+  <script src="https://unpkg.com/compromise@13.11.3/builds/compromise.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+    .output {
+      margin-top: 20px;
+      font-size: 16px;
+      white-space: pre-wrap;
+    }
+    #loader {
+      visibility: hidden;
+      font-weight: bold;
+      color: #555;
+      margin-top: 15px;
+    }
+    #fileInput {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>POS Tagger Itemized</h1>
+  <input type="file" id="fileInput" onchange="processFile()" />
+  <div id="loader">Processing text, please wait...</div>
+
+  <script>
+    const priorityOrder = [
+      "Noun", "Verb", "Value", "Date", "Adjective", "Contraction", "Adverb", "Currency", "Determiner",
+      "Conjunction", "Preposition", "QuestionWord", "Pronoun", "Expression", "Abbreviation", "Url",
+      "HashTag", "PhoneNumber", "AtMention", "Emoji", "Emoticon", "Email", "Auxiliary", "Negative", "Acronym"
+    ];
+
+    // Trigger when a file is uploaded
+    function processFile() {
+      const fileInput = document.getElementById("fileInput");
+      const file = fileInput.files[0];
+
+      if (!file) {
+        alert("Please select a file.");
+        return;
+      }
+
+      // Show loader immediately after file selection
+      document.getElementById("loader").style.visibility = "visible";
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const content = e.target.result;
+        const lines = content.split("\n");
+        processCSV(lines);
+      };
+      
+      reader.readAsText(file);
+    }
+
+    // Process the CSV content
+    function processCSV(lines) {
+      const processedRows = [];
+      const headerRow = ["Original String", ...priorityOrder];  // Headers for the CSV
+      processedRows.push(headerRow);
+
+      lines.forEach((line) => {
+        const trimmedLine = line.trim();
+        if (trimmedLine) {
+          const posCounts = getPOSCounts(trimmedLine);
+          const row = [trimmedLine, ...priorityOrder.map(tag => posCounts[tag] || 0)];
+          processedRows.push(row);
+        }
+      });
+
+      // Use a timeout to simulate processing time and then trigger the CSV download
+      setTimeout(() => {
+        downloadCSV(processedRows);
+      }, 2000);  // Simulate processing delay
+    }
+
+    // Count POS tags for each string
+    function getPOSCounts(text) {
+      const doc = nlp(text);
+      const terms = doc.terms().json();
+      const posCounts = {};
+
+      // Initialize all POS counts to zero
+      priorityOrder.forEach(tag => {
+        posCounts[tag] = 0;
+      });
+
+      // Count the POS tags
+      terms.forEach(termBlock => {
+        termBlock.terms.forEach(t => {
+          const tags = t.tags || [];
+          tags.forEach(tag => {
+            if (priorityOrder.includes(tag)) {
+              posCounts[tag] = (posCounts[tag] || 0) + 1;
+            }
+          });
+        });
+      });
+
+      return posCounts;
+    }
+
+    // Download the processed CSV
+    function downloadCSV(data) {
+      const csvContent = "data:text/csv;charset=utf-8," + data.map(row => row.join(",")).join("\n");
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "itemized_pos.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Hide the loader after download is triggered
+      document.getElementById("loader").style.visibility = "hidden";
+    }
+  </script>
+</body>
+</html>
