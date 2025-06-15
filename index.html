@@ -82,31 +82,47 @@
       }, 2000);  // Simulate processing delay
     }
 
-    // Count POS tags for each string
-    function getPOSCounts(text) {
-      const doc = nlp(text);
-      const terms = doc.terms().json();
-      const posCounts = {};
 
-      // Initialize all POS counts to zero
-      priorityOrder.forEach(tag => {
-        posCounts[tag] = 0;
-      });
+// Count POS tags for each string
+function getPOSCounts(text) {
+  // Treat hyphen-connected words as single terms
+  const mergedText = text.replace(/\b(\w+)-(\w+)\b/g, (match, p1, p2) => `${p1}-${p2}`);
 
-      // Count the POS tags
-      terms.forEach(termBlock => {
-        termBlock.terms.forEach(t => {
-          const tags = t.tags || [];
-          tags.forEach(tag => {
-            if (priorityOrder.includes(tag)) {
-              posCounts[tag] = (posCounts[tag] || 0) + 1;
-            }
-          });
+  const doc = nlp(mergedText);
+  const terms = doc.terms().json();
+  const posCounts = {};
+
+  // Initialize all POS counts to zero
+  priorityOrder.forEach(tag => {
+    posCounts[tag] = 0;
+  });
+
+  // Count the POS tags, including for hyphenated tokens
+  terms.forEach(termBlock => {
+    termBlock.terms.forEach(t => {
+      const text = t.text || '';
+      const tags = t.tags || [];
+
+      // Special case: if word is hyphenated, re-check tagging
+      if (text.includes('-')) {
+        const reTag = nlp(text).terms().json()[0]?.terms[0]?.tags || [];
+        reTag.forEach(tag => {
+          if (priorityOrder.includes(tag)) {
+            posCounts[tag] = (posCounts[tag] || 0) + 1;
+          }
         });
-      });
+      } else {
+        tags.forEach(tag => {
+          if (priorityOrder.includes(tag)) {
+            posCounts[tag] = (posCounts[tag] || 0) + 1;
+          }
+        });
+      }
+    });
+  });
 
-      return posCounts;
-    }
+  return posCounts;
+}
 
     // Download the processed CSV
     function downloadCSV(data) {
